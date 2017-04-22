@@ -1,6 +1,8 @@
 #include <Process.h>
 #include <Console.h>
 
+#define DEBUG true
+
 Process date;
 const byte PIN_MOONLIGHT = 6;
 
@@ -8,6 +10,7 @@ const byte LUMINOSITY_MAX = 16;
 const byte LUMINOSITY_INCREMENT = 1;
 const unsigned long MILLIS_PER_LUMINOSITY_STEP = (12L * 60L * 1000L);
 const unsigned long BAUT_BRIDGE = 115200L;
+const unsigned int BAUT_SERIAL = 9600;
 const unsigned int BOOT_DELAY = 5000;
 
 const byte HOURS_OF_MOONLIGHT = 6;
@@ -16,51 +19,70 @@ const byte HOURS_END = (HOURS_START + HOURS_OF_MOONLIGHT) % 24;
 
 byte LUMINOSITY_MODIFIER = 1;
 byte luminosity;
-unsigned long millisAtLastIteration;
+unsigned long millisSinceLastLuminosityChange;
 
 void setup() {
-  Console.begin();
-  while(!Console);
-  Console.println("Waiting for kernel to boot.");
+  if (DEBUG) {
+    Serial.begin(BAUT_SERIAL);
+    while(!Serial);
+    Serial.println("Waiting for kernel to boot.");
+  }
   delay(BOOT_DELAY);
-  Console.println("Bridging to AR9331.");
   Bridge.begin(BAUT_BRIDGE);
   pinMode(PIN_MOONLIGHT, OUTPUT);
   luminosity = 0;
-  millisAtLastIteration = 0;
-  Console.println("Starting moonlight simulation");
+  millisSinceLastLuminosityChange = 0;
+  if (DEBUG) {
+    Serial.println("Starting moonlight simulation");
+  }
 }
 
 void loop() {
-  byte luminosity = 0;
   byte currentHour = getHours();
+  if (DEBUG) {
+    Serial.print("H: ");
+    Serial.print(currentHour);
+    Serial.print("\n");
+  }
 
   if (currentHour >= HOURS_START || currentHour <= HOURS_END) {
-    luminosity = getLuminosity();
+    luminosity = getLuminosity(luminosity);
   } else {
     luminosity = 0;
-    millisAtLastIteration = 0;
+    millisSinceLastLuminosityChange = 0;
   }
 
   analogWrite(PIN_MOONLIGHT, luminosity);
 }
 
-byte getLuminosity() {
+byte getLuminosity(byte currentLuminosity) {
+  static unsigned long millisAtLastIteration = 0;
   unsigned long millisNow = millis();
+  millisSinceLastLuminosityChange += (millisNow - millisAtLastIteration);
+  byte lum = currentLuminosity;
 
-  if (millisNow - millisAtLastIteration >= MILLIS_PER_LUMINOSITY_STEP) {
-    luminosity += (LUMINOSITY_INCREMENT * LUMINOSITY_MODIFIER);
-    Console.print("luminosity: ");
-    Console.print(luminosity);
-    Console.print("\n");
+  if (DEBUG) {
+    Serial.print("millisNow - millisAtLastIteration ");
+    Serial.print((millisNow - millisAtLastIteration));
+    Serial.print("\n");
   }
 
-  if (luminosity <= 0 || luminosity >= LUMINOSITY_MAX) {
+  if (millisSinceLastLuminosityChange >= MILLIS_PER_LUMINOSITY_STEP) {
+    lum += (LUMINOSITY_INCREMENT * LUMINOSITY_MODIFIER);
+    millisSinceLastLuminosityChange = 0;
+    if (DEBUG) {
+      Serial.print("luminosity: ");
+      Serial.print(luminosity);
+      Serial.print("\n");
+    }
+  }
+
+  if (lum <= 0 || lum >= LUMINOSITY_MAX) {
     LUMINOSITY_MODIFIER  *= -1;
   }
 
   millisAtLastIteration = millisNow;
-  return luminosity;
+  return lum;
 }
 
 byte getHours() {

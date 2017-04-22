@@ -1,3 +1,6 @@
+## 1.0.3
+* Fix non-incrementing luminosity timer
+
 ## 1.0.2
 * Fix luminosity calculation leftover bug
 
