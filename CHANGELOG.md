@@ -1,7 +1,5 @@
 ## 2.0.0
-* Calculate hours of moonlight per day of year
-* Calculate moonrise per day of year
-* Calculate maximum luminocity per day of month
+* Calculate moonlight based on day and time.
 
 ## 1.0.3
 * Fix non-incrementing luminosity timer
