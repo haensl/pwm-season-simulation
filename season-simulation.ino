@@ -26,15 +26,15 @@ const float SKEW_MONTHLY_MOONLIGHT_LUMINOSITY = 4.3f;
 const unsigned long BAUT_BRIDGE = 115200L;
 
 /**
- * Wait before initializing the bridge, to give the linux kernel time to boot.
+ * Wait this many milliseconds before initializing the bridge, to give the linux kernel time to boot.
  */
 const unsigned int BOOT_DELAY = 5000;
 
-boolean mooncycleCompleted;
+boolean lunarCycleCompleted;
 boolean moonlightShiningAtLastIteration;
 
 void setup() {
-  mooncycleCompleted = true;
+  lunarCycleCompleted = true;
   moonlightShiningAtLastIteration = false;
   pinMode(PIN_MOONLIGHT, OUTPUT);
   analogWrite(PIN_MOONLIGHT, 0);
@@ -43,17 +43,17 @@ void setup() {
 }
 
 void loop() {
-  analogWrite(PIN_MOONLIGHT, moonlight());
+  analogWrite(PIN_MOONLIGHT, lunarCycle());
 }
 
-byte moonlight() {
+byte lunarCycle() {
   static unsigned int dayOfYear;
   static byte dayOfMonth;
   static byte hoursOfMoonlight;
   static byte hourOfMoonrise;
   static byte maximumMoonlightLuminosityOfDay;
 
-  if (mooncycleCompleted) {
+  if (lunarCycleCompleted) {
     dayOfYear = getDayOfYear();
     dayOfMonth = getDayOfMonth();
     hoursOfMoonlight = getHoursOfMoonlight(dayOfYear);
@@ -62,7 +62,7 @@ byte moonlight() {
   }
 
   byte moonlightLuminosity = getMoonlightLuminosity(hoursOfMoonlight, hourOfMoonrise, maximumMoonlightLuminosityOfDay, getTime());
-  mooncycleCompleted = moonlightShiningAtLastIteration && moonlightLuminosity <= 0;
+  lunarCycleCompleted = moonlightShiningAtLastIteration && moonlightLuminosity <= 0;
   moonlightShiningAtLastIteration = moonlightLuminosity > 0;
   return moonlightLuminosity;
 }
