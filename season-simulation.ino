@@ -1,6 +1,12 @@
+// uncomment to do a dry run
+// #define DRY_RUN
 #include <Process.h>
 #include <Math.h>
 #define COLON ":"
+
+#ifdef DRY_RUN
+#include <Console.h>
+#endif
 
 typedef struct Time {
   byte hours;
@@ -40,11 +46,72 @@ void setup() {
   analogWrite(PIN_MOONLIGHT, 0);
   delay(BOOT_DELAY);
   Bridge.begin(BAUT_BRIDGE);
+
+#ifdef DRY_RUN
+  Console.begin();
+  while(!Console);
+  Console.println("Starting dry run.");
+
+  for (unsigned int dayOfYear = 1; dayOfYear < 357; dayOfYear++) {
+    byte dayOfMonth = dayOfYear % DAYS_PER_MONTH;
+    for (byte hour = 0; hour < HOURS_PER_DAY; hour++) {
+      lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 30, 0 });
+    }
+  }
+#endif
 }
 
 void loop() {
+#ifdef DRY_RUN
+  
+#else
   analogWrite(PIN_MOONLIGHT, lunarCycle());
+#endif
 }
+
+#ifdef DRY_RUN
+byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
+  Console.println("");
+  Console.print(dayOfYear);
+  Console.print(". day of year\n");
+  Console.print(dayOfMonth);
+  Console.print(". day of month\n");
+  Console.print("\nlunar cycle completed ");
+  Console.print(lunarCycleCompleted);
+  Console.print("\nmoonlight shining at last iteration ");
+  Console.print(moonlightShiningAtLastIteration);
+
+  static byte hoursOfMoonlight;
+  static byte hourOfMoonrise;
+  static byte maximumMoonlightLuminosityOfDay;
+
+  if (lunarCycleCompleted) {
+    hoursOfMoonlight = getHoursOfMoonlight(dayOfYear);
+    hourOfMoonrise = getHourOfMoonrise(dayOfYear);
+    maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth);
+  }
+
+  Console.print("\nhours of moonlight ");
+  Console.print(hoursOfMoonlight);
+  Console.print("\nhour of moonrise ");
+  Console.print(hourOfMoonrise);
+  Console.print("\nmaximum moonlight luminosity of day ");
+  Console.print(maximumMoonlightLuminosityOfDay);
+
+  byte moonlightLuminosity = getMoonlightLuminosity(hoursOfMoonlight, hourOfMoonrise, maximumMoonlightLuminosityOfDay, t);
+  Console.print("\nmoonlight luminosity\n");
+  Console.print(t.hours);
+  Console.print(":");
+  Console.print(t.minutes);
+  Console.print(" - ");
+  Console.print(moonlightLuminosity);
+  Console.print("\n ---");
+  Console.flush();
+  lunarCycleCompleted = moonlightShiningAtLastIteration && moonlightLuminosity <= 0;
+  moonlightShiningAtLastIteration = moonlightLuminosity > 0;
+  return moonlightLuminosity;
+}
+#endif
 
 byte lunarCycle() {
   static unsigned int dayOfYear;
@@ -72,7 +139,7 @@ byte getHoursOfMoonlight(unsigned int dayOfYear) {
 }
 
 byte getHourOfMoonrise(unsigned int dayOfYear) {
-  return (byte)round((HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / DAYS_PER_MONTH + SKEW_MONTHLY_MOONLIGHT_LUMINOSITY)) + (HOURS_PER_DAY / 2.0f));
+  return (byte)round((HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / DAYS_PER_MONTH + SKEW_MONTHLY_MOONLIGHT_LUMINOSITY)) + (HOURS_PER_DAY / 2.0f)) % HOURS_PER_DAY;
 }
 
 byte getMaximumMoonlightLuminosity(byte dayOfMonth) {
