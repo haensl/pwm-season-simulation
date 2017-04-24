@@ -1,5 +1,5 @@
 // uncomment to do a dry run
-#define DRY_RUN
+// #define DRY_RUN
 #include <Process.h>
 #include <Math.h>
 #define COLON ":"
