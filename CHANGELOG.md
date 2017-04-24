@@ -1,3 +1,6 @@
+## 2.1.1
+* Fix a bug that caused moonlight luminosity to be miscalculated upon day change.
+
 ## 2.1.0
 * Work with accurate days per month.
 

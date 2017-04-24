@@ -1,5 +1,5 @@
 // uncomment to do a dry run
-// #define DRY_RUN
+#define DRY_RUN
 #include <Process.h>
 #include <Math.h>
 #define COLON ":"
@@ -56,7 +56,7 @@ void setup() {
   Console.print(" days per month.\n");
   
   for (unsigned int dayOfYear = 1; dayOfYear < 357; dayOfYear++) {
-    byte dayOfMonth = dayOfYear % DRY_RUN_DAYS_PER_MONTH;
+    byte dayOfMonth = max(dayOfYear % DRY_RUN_DAYS_PER_MONTH, 1);
     for (byte hour = 0; hour < HOURS_PER_DAY; hour++) {
       lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 30, 0 });
     }
@@ -154,7 +154,13 @@ byte getMaximumMoonlightLuminosity(byte dayOfMonth, byte daysInMonth) {
 }
 
 byte getMoonlightLuminosity(byte hoursOfMoonlight, byte hourOfMoonrise, byte maxLuminosity, Time t) {
-  float currentMoonhour = (t.hours - hourOfMoonrise) + (t.minutes / 60.0f);
+  float currentMoonhour;
+  if (t.hours - hourOfMoonrise >= 0) {
+   currentMoonhour = (t.hours - hourOfMoonrise) + (t.minutes / 60.0f);
+  } else {
+    currentMoonhour = (HOURS_PER_DAY + t.hours - hourOfMoonrise) + (t.minutes / 60.0f);
+  }
+
   float hourOfMaximumLuminosity = hoursOfMoonlight / 2.0f;
 
   if (currentMoonhour >= 0 && currentMoonhour <= hoursOfMoonlight) {
