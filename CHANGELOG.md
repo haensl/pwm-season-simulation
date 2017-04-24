@@ -1,3 +1,6 @@
+## 2.1.0
+* Work with accurate days per month.
+
 ## 2.0.0
 * Add lunar cycle simulation.
 * Add dry run capability.

@@ -27,13 +27,13 @@ The baut rate for the bridge of your board.
 
 Time in `[ms]` to wait before initializing the bridge in order to give the linux kernel time to boot.
 
-#### `DAYS_PER_MONTH`
-
-How many days to assume per month.
-
 #### <a name="dry-run"></a>`DRY_RUN`
 
 Uncomment the `DRY_RUN` flag to do a dry run and debug/verify your setup. State data is output via [Console](https://www.arduino.cc/en/Reference/YunConsoleConstructor).
+
+#### `DRY_RUN_DAYS_PER_MONTH`
+
+How many days to assume per month in a dry run.
 
 #### `LUMINOSITY_MAX_MOONLIGHT`
 
