@@ -1,11 +1,12 @@
 // uncomment to do a dry run
-// #define DRY_RUN
+#define DRY_RUN
 #include <Process.h>
 #include <Math.h>
 #define COLON ":"
 
 #ifdef DRY_RUN
 #include <Console.h>
+const byte DRY_RUN_DAYS_PER_MONTH = 30;
 #endif
 
 typedef struct Time {
@@ -17,7 +18,6 @@ typedef struct Time {
 const byte PIN_MOONLIGHT = 6;
 const byte LUMINOSITY_MAX_MOONLIGHT = 16; // maximum luminosity -- i.e. pwm at full moon
 const byte MAX_MOONLIGHT_HOURS_PER_DAY = 12;
-const byte DAYS_PER_MONTH = 30;
 const byte HOURS_PER_DAY = 24;
 
 /**
@@ -51,9 +51,12 @@ void setup() {
   Console.begin();
   while(!Console);
   Console.println("Starting dry run.");
-
+  Console.print("Assuming ");
+  Console.print(DRY_RUN_DAYS_PER_MONTH);
+  Console.print(" days per month.\n");
+  
   for (unsigned int dayOfYear = 1; dayOfYear < 357; dayOfYear++) {
-    byte dayOfMonth = dayOfYear % DAYS_PER_MONTH;
+    byte dayOfMonth = dayOfYear % DRY_RUN_DAYS_PER_MONTH;
     for (byte hour = 0; hour < HOURS_PER_DAY; hour++) {
       lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 30, 0 });
     }
@@ -86,9 +89,9 @@ byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
   static byte maximumMoonlightLuminosityOfDay;
 
   if (lunarCycleCompleted) {
-    hoursOfMoonlight = getHoursOfMoonlight(dayOfYear);
-    hourOfMoonrise = getHourOfMoonrise(dayOfYear);
-    maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth);
+    hoursOfMoonlight = getHoursOfMoonlight(dayOfYear, DRY_RUN_DAYS_PER_MONTH);
+    hourOfMoonrise = getHourOfMoonrise(dayOfYear, DRY_RUN_DAYS_PER_MONTH);
+    maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth, DRY_RUN_DAYS_PER_MONTH);
   }
 
   Console.print("\nhours of moonlight ");
@@ -116,6 +119,7 @@ byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
 byte lunarCycle() {
   static unsigned int dayOfYear;
   static byte dayOfMonth;
+  static byte daysInMonth;
   static byte hoursOfMoonlight;
   static byte hourOfMoonrise;
   static byte maximumMoonlightLuminosityOfDay;
@@ -123,9 +127,12 @@ byte lunarCycle() {
   if (lunarCycleCompleted) {
     dayOfYear = getDayOfYear();
     dayOfMonth = getDayOfMonth();
-    hoursOfMoonlight = getHoursOfMoonlight(dayOfYear);
-    hourOfMoonrise = getHourOfMoonrise(dayOfYear);
-    maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth);
+    if (dayOfMonth == 1) {
+      daysInMonth = getDaysInMonth();
+    }
+    hoursOfMoonlight = getHoursOfMoonlight(dayOfYear, daysInMonth);
+    hourOfMoonrise = getHourOfMoonrise(dayOfYear, daysInMonth);
+    maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth, daysInMonth);
   }
 
   byte moonlightLuminosity = getMoonlightLuminosity(hoursOfMoonlight, hourOfMoonrise, maximumMoonlightLuminosityOfDay, getTime());
@@ -134,16 +141,16 @@ byte lunarCycle() {
   return moonlightLuminosity;
 }
 
-byte getHoursOfMoonlight(unsigned int dayOfYear) {
-  return (byte)round((MAX_MOONLIGHT_HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / DAYS_PER_MONTH + SKEW_START_OF_YEAR_MOONLIGHT_LUMINOSITY)) + (MAX_MOONLIGHT_HOURS_PER_DAY / 2.0f));
+byte getHoursOfMoonlight(unsigned int dayOfYear, byte daysInMonth) {
+  return (byte)round((MAX_MOONLIGHT_HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / daysInMonth + SKEW_START_OF_YEAR_MOONLIGHT_LUMINOSITY)) + (MAX_MOONLIGHT_HOURS_PER_DAY / 2.0f));
 }
 
-byte getHourOfMoonrise(unsigned int dayOfYear) {
-  return (byte)round((HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / DAYS_PER_MONTH + SKEW_MONTHLY_MOONLIGHT_LUMINOSITY)) + (HOURS_PER_DAY / 2.0f)) % HOURS_PER_DAY;
+byte getHourOfMoonrise(unsigned int dayOfYear, byte daysInMonth) {
+  return (byte)round((HOURS_PER_DAY / M_PI) * asin(cos(M_PI * dayOfYear / daysInMonth + SKEW_MONTHLY_MOONLIGHT_LUMINOSITY)) + (HOURS_PER_DAY / 2.0f)) % HOURS_PER_DAY;
 }
 
-byte getMaximumMoonlightLuminosity(byte dayOfMonth) {
-  return (byte)round(-(LUMINOSITY_MAX_MOONLIGHT / 2.0f) * (2.0f / M_PI) * asin(cos(M_PI * dayOfMonth / (DAYS_PER_MONTH / 2.0f))) + (LUMINOSITY_MAX_MOONLIGHT / 2.0f));
+byte getMaximumMoonlightLuminosity(byte dayOfMonth, byte daysInMonth) {
+  return (byte)round(-(LUMINOSITY_MAX_MOONLIGHT / 2.0f) * (2.0f / M_PI) * asin(cos(M_PI * dayOfMonth / (daysInMonth / 2.0f))) + (LUMINOSITY_MAX_MOONLIGHT / 2.0f));
 }
 
 byte getMoonlightLuminosity(byte hoursOfMoonlight, byte hourOfMoonrise, byte maxLuminosity, Time t) {
@@ -208,6 +215,32 @@ byte getDayOfMonth() {
   }
 
   return (byte)dom.toInt();
+}
+
+byte getDaysInMonth() {
+  byte days = 31;
+  byte daysInMonth = 31;
+
+  while (days > 26) {
+    Process date;
+    date.begin("/bin/date");
+    date.addParameter("+%d");
+    date.addParameter("-d \"" + String(days) + "\"");
+    date.addParameter("-D \"%d\"");
+    date.run();
+
+    while (date.available() > 0) {
+      daysInMonth = (byte)date.readString().toInt();
+    }
+
+    if (daysInMonth == days) {
+      return days;
+    }
+
+    days--;
+  }
+
+  return days;
 }
 
 /**
