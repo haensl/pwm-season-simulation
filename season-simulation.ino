@@ -19,6 +19,7 @@ const byte PIN_MOONLIGHT = 6;
 const byte LUMINOSITY_MAX_MOONLIGHT = 16; // maximum luminosity -- i.e. pwm at full moon
 const byte MAX_MOONLIGHT_HOURS_PER_DAY = 12;
 const byte HOURS_PER_DAY = 24;
+const unsigned long MILLIS_PER_DAY = HOURS_PER_DAY * 60L * 60L * 1000L;
 
 /**
  * Skews adjust the moonlight luminosity based on location around the globe.
@@ -55,10 +56,16 @@ void setup() {
   Console.print(DRY_RUN_DAYS_PER_MONTH);
   Console.print(" days per month.\n");
   
-  for (unsigned int dayOfYear = 1; dayOfYear < 357; dayOfYear++) {
+  for (unsigned int dayOfYear = 45; dayOfYear < 357; dayOfYear++) {
     byte dayOfMonth = max(dayOfYear % DRY_RUN_DAYS_PER_MONTH, 1);
     for (byte hour = 0; hour < HOURS_PER_DAY; hour++) {
-      lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 30, 0 });
+      for (byte i = 1; i < 3; i++) {
+        if (i % 2 == 0) {
+          lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 30, 0 });
+        } else {
+          lunarCycleDryRun(dayOfYear, dayOfMonth, { hour, 0, 0 });
+        }
+      }
     }
   }
 #endif
@@ -88,7 +95,7 @@ byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
   static byte hourOfMoonrise;
   static byte maximumMoonlightLuminosityOfDay;
 
-  if (lunarCycleCompleted) {
+  if (lunarCycleCompleted || (hoursOfMoonlight == 0 && t.hours == 0 && t.minutes == 0)) {
     hoursOfMoonlight = getHoursOfMoonlight(dayOfYear, DRY_RUN_DAYS_PER_MONTH);
     hourOfMoonrise = getHourOfMoonrise(dayOfYear, DRY_RUN_DAYS_PER_MONTH);
     maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth, DRY_RUN_DAYS_PER_MONTH);
@@ -123,8 +130,9 @@ byte lunarCycle() {
   static byte hoursOfMoonlight;
   static byte hourOfMoonrise;
   static byte maximumMoonlightLuminosityOfDay;
+  Time t = getTime();
 
-  if (lunarCycleCompleted) {
+  if (lunarCycleCompleted || (hoursOfMoonlight == 0 && t.hours == 0 && t.minutes == 0)) {
     dayOfYear = getDayOfYear();
     dayOfMonth = getDayOfMonth();
     if (dayOfMonth == 1) {
@@ -135,7 +143,7 @@ byte lunarCycle() {
     maximumMoonlightLuminosityOfDay = getMaximumMoonlightLuminosity(dayOfMonth, daysInMonth);
   }
 
-  byte moonlightLuminosity = getMoonlightLuminosity(hoursOfMoonlight, hourOfMoonrise, maximumMoonlightLuminosityOfDay, getTime());
+  byte moonlightLuminosity = getMoonlightLuminosity(hoursOfMoonlight, hourOfMoonrise, maximumMoonlightLuminosityOfDay, t);
   lunarCycleCompleted = moonlightShiningAtLastIteration && moonlightLuminosity <= 0;
   moonlightShiningAtLastIteration = moonlightLuminosity > 0;
   return moonlightLuminosity;

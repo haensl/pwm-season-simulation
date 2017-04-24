@@ -1,5 +1,8 @@
+## 2.1.2
+* Fix a bug that causes lunar cycles not to be reset when there is no moon.
+
 ## 2.1.1
-* Fix a bug that caused moonlight luminosity to be miscalculated upon day change.
+* Fix a bug that causes moonlight luminosity to be miscalculated upon day change.
 
 ## 2.1.0
 * Work with accurate days per month.
