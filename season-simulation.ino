@@ -1,5 +1,5 @@
 // uncomment to do a dry run
-// #define DRY_RUN
+#define DRY_RUN
 #include <Process.h>
 #include <Math.h>
 #define COLON ":"
@@ -13,12 +13,21 @@ typedef struct Time {
   byte hours;
   byte minutes;
   byte seconds;
+  unsigned int dayOfYear;
 } Time;
 
 const byte PIN_MOONLIGHT = 6;
+
 const byte LUMINOSITY_MAX_MOONLIGHT = 16; // maximum luminosity -- i.e. pwm at full moon
 const byte MAX_MOONLIGHT_HOURS_PER_DAY = 12;
+const float DAYS_IN_LUNAR_CYCLE = 29.5f;
+const float FACTOR_DISTANCE_MOON_EARTH = 0.085f;
+
 const byte HOURS_PER_DAY = 24;
+const byte MINUTES_PER_HOUR = 60;
+const byte SECONDS_PER_MINUTE = MINUTES_PER_HOUR;
+const unsigned int MILLIS_PER_SECOND = 1000;
+const unsigned int DAYS_PER_YEAR = 365;
 const unsigned long MILLIS_PER_DAY = HOURS_PER_DAY * 60L * 60L * 1000L;
 
 /**
@@ -26,6 +35,7 @@ const unsigned long MILLIS_PER_DAY = HOURS_PER_DAY * 60L * 60L * 1000L;
  */
 const float SKEW_START_OF_YEAR_MOONLIGHT_LUMINOSITY = 4.2f;
 const float SKEW_MONTHLY_MOONLIGHT_LUMINOSITY = 4.3f;
+const float MOON_LOCATION_PHASE_OFFSET = -5.0f;
 
 /**
  * Set correct baut rate depending on board.
@@ -39,6 +49,7 @@ const unsigned int BOOT_DELAY = 5000;
 
 boolean lunarCycleCompleted;
 boolean moonlightShiningAtLastIteration;
+Time currentTime;
 
 void setup() {
   lunarCycleCompleted = true;
@@ -47,6 +58,7 @@ void setup() {
   analogWrite(PIN_MOONLIGHT, 0);
   delay(BOOT_DELAY);
   Bridge.begin(BAUT_BRIDGE);
+  currentTime = getTime();
 
 #ifdef DRY_RUN
   Console.begin();
@@ -56,6 +68,7 @@ void setup() {
   Console.print(DRY_RUN_DAYS_PER_MONTH);
   Console.print(" days per month.\n");
   
+  /**
   for (unsigned int dayOfYear = 45; dayOfYear < 357; dayOfYear++) {
     byte dayOfMonth = max(dayOfYear % DRY_RUN_DAYS_PER_MONTH, 1);
     for (byte hour = 0; hour < HOURS_PER_DAY; hour++) {
@@ -67,18 +80,28 @@ void setup() {
         }
       }
     }
+  }*/
+  for (unsigned int d = 1; d < 366; d++) {
+    Console.print("\nMaximum moonlight luminosity ");
+    Console.print(d);
+    Console.print(": ");
+    Console.print(getMaximumMoonlightLuminosity(d));
+    Console.flush();
   }
+  
 #endif
 }
 
+
 void loop() {
+  syncTime(&currentTime);
 #ifdef DRY_RUN
-  
 #else
   analogWrite(PIN_MOONLIGHT, lunarCycle());
 #endif
 }
 
+/**
 #ifdef DRY_RUN
 byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
   Console.println("");
@@ -122,7 +145,7 @@ byte lunarCycleDryRun(unsigned int dayOfYear, byte dayOfMonth, Time t) {
   return moonlightLuminosity;
 }
 #endif
-
+*/
 byte lunarCycle() {
   static unsigned int dayOfYear;
   static byte dayOfMonth;
@@ -161,6 +184,27 @@ byte getMaximumMoonlightLuminosity(byte dayOfMonth, byte daysInMonth) {
   return (byte)round(-(LUMINOSITY_MAX_MOONLIGHT / 2.0f) * (2.0f / M_PI) * asin(cos(M_PI * dayOfMonth / (daysInMonth / 2.0f))) + (LUMINOSITY_MAX_MOONLIGHT / 2.0f));
 }
 
+
+float getNormalizedDistanceToEarth(unsigned int dayOfYear) {
+  return 1.0f - (FACTOR_DISTANCE_MOON_EARTH * (1.0f + sin(2.0f * M_PI * ((float)dayOfYear / (float)DAYS_PER_YEAR))));
+}
+
+float getNormalizedMoonlightLuminosity(unsigned int dayOfYear) {
+  return 0.5f * (1 + sin(2.0f * M_PI * ((((float)dayOfYear) + MOON_LOCATION_PHASE_OFFSET) / DAYS_IN_LUNAR_CYCLE)));
+}
+
+// TODO: sin function for time of moonrise!
+// get day in lunar cycle [1, 29.5]
+// moonrise increases/decreases by roughly 30mins per day in lunar cycle
+
+byte getMaximumMoonlightLuminosity(unsigned int dayOfYear) {
+  return (byte)round((float)LUMINOSITY_MAX_MOONLIGHT * getNormalizedMoonlightLuminosity(dayOfYear));
+}
+
+byte getHoursOfMoonlight(unsigned int dayOfYear) {
+  return (byte)round(MAX_MOONLIGHT_HOURS * getNormalizedMoonlightLuminosity(dayOfYear) * getNormalizedDistanceToEarth(dayOfYear));
+}
+
 byte getMoonlightLuminosity(byte hoursOfMoonlight, byte hourOfMoonrise, byte maxLuminosity, Time t) {
   float currentMoonhour;
   if (t.hours - hourOfMoonrise >= 0) {
@@ -197,10 +241,46 @@ Time getTime() {
   t = {
     (byte)timeString.substring(0, firstColon).toInt(),
     (byte)timeString.substring(firstColon + 1, secondColon).toInt(),
-    (byte)timeString.substring(secondColon + 1).toInt()
+    (byte)timeString.substring(secondColon + 1).toInt(),
+    getDayOfYear()
   };
 
   return t;
+}
+
+void syncTime(Time * t) {
+  static unsigned long lastSync = 0L;
+  unsigned long now = millis();
+
+  if (now < (unsigned long)MILLIS_PER_SECOND) {
+    lastSync = 0L; // this is needed to account for millis() overflow!
+    return;
+  }
+
+  unsigned long delta = now - lastSync;
+  if (delta >= (unsigned long)MILLIS_PER_SECOND) {
+    t->seconds++;
+    if (t->seconds >= SECONDS_PER_MINUTE) {
+      t->minutes++;
+      t->seconds %= SECONDS_PER_MINUTE;
+
+      if (t->minutes >= MINUTES_PER_HOUR) {
+        t->hours++;
+        t->minutes %= MINUTES_PER_HOUR;
+
+        if (t->hours >= HOURS_PER_DAY) {
+          t->dayOfYear++;
+          t->hours %= HOURS_PER_DAY;
+
+          if (t->dayOfYear >= DAYS_PER_YEAR) {
+            t->dayOfYear %= DAYS_PER_YEAR - 1;
+          }
+        }
+      }
+    }
+
+    lastSync = now - (delta - MILLIS_PER_SECOND);
+  }
 }
 
 unsigned int getDayOfYear() {
